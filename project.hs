@@ -4,6 +4,7 @@ import Data.Ord
 import System.IO
 import Data.List.Split
 import Data.Maybe
+import GHC.Float
 
 type FileName = String
 type AttributeName = String
@@ -55,6 +56,33 @@ createAttributes x y =
         attributes = [ Attribute a | a <- tuples]
     in attributes
 
+entropy :: Float -> Float -> Float
+entropy a b =    
+    if isNaN ent then (double2Float 0.0) else ent
+    where ent = (-a*(logBase 2 a)-b*(logBase 2 b))
+
+purity :: Set -> AttributeName -> Float
+purity a b =
+    let setData = dataset a
+        setDataResultIndex = (length setData)-1
+        valuesResult = getDomainValues a ((getAttributeNames a)!!setDataResultIndex)
+        -- entropyResult = entropy valuesResult
+        uniqueValuesDomain = unique domainValues
+        uniqueValuesResult = unique valuesResult
+        temp = getAllOccurences domainValues valuesResult uniqueValuesResult uniqueValuesDomain
+    in double2Float(0.0)
+    where domainValues = getDomainValues a b
+
+getAllOccurences :: [DomainValue] -> [DomainValue] -> [DomainValue] -> [DomainValue] -> [Int]
+getAllOccurences domainValues valuesResult uniqueValuesResult [] = []
+getAllOccurences domainValues valuesResult uniqueValuesResult (uniqueDomainValue:uniqueValuesDomain) =
+    (getOccurences domainValues valuesResult uniqueValuesResult uniqueDomainValue) ++ (getAllOccurences domainValues valuesResult uniqueValuesResult uniqueValuesDomain)
+
+getOccurences :: [DomainValue] -> [DomainValue] -> [DomainValue] -> DomainValue -> [Int]
+getOccurences domainValues valuesResult uniqueValuesResult uniqueDomainValue =
+    [length [y | y <- domainValues, y == uniqueDomainValue && (valuesResult!!(fromJust $ (elemIndex y domainValues))) == (uniqueValuesResult!!0)]] ++
+    [length [y | y <- domainValues, y == uniqueDomainValue && (valuesResult!!(fromJust $ (elemIndex y domainValues))) == (uniqueValuesResult!!1)]]
+
 -- Main function type = IO().
 main :: IO ()
 main = do
@@ -77,9 +105,16 @@ main = do
 
     let temp = (readCsv "data/weather.csv")
     set <- temp
+    print set
     let attributeNames = (getAttributeNames set)
     print attributeNames
     print (getDomainValues set (attributeNames!!1))
+
+    let ent = entropy 0.642857143 0.357142857
+    print ent
+
+    let temp = getAllOccurences ["overcast","overcast","overcast","overcast","rainy","rainy","rainy","rainy","rainy","sunny","sunny","sunny","sunny","sunny"] ["yes","yes","yes","yes","yes","yes","no","yes","no","no","no","no","yes","yes"] ["yes","no"] ["overcast","rainy","sunny"]
+    print temp
 
     putStrLn("End of program")
 
