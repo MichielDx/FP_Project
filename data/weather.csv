@@ -1,0 +1,15 @@
+Outlook,Temperature,Humidity,Windy,Play
+overcast,hot,high,false,yes
+overcast,cool,normal,true,yes
+overcast,mild,high,true,yes
+overcast,hot,normal,false,yes
+rainy,mild,high,false,yes
+rainy,cool,normal,false,yes
+rainy,cool,normal,true,no
+rainy,mild,normal,false,yes
+rainy,mild,high,true,no
+sunny,hot,high,false,no
+sunny,hot,high,true,no
+sunny,mild,high,false,no
+sunny,cool,normal,false,yes
+sunny,mild,normal,true,yes
