@@ -50,38 +50,40 @@ createInstance x =
     in temp
 
 createAttributes :: [String] -> [Instance] ->  [Attribute]
-createAttributes x y =
-    
+createAttributes x y =    
     let tuples = [(a,[(b!!(fromJust $ (elemIndex a x))) | b <- y]) | a <- x]
         attributes = [ Attribute a | a <- tuples]
     in attributes
 
-entropy :: Float -> Float -> Float
-entropy a b =    
-    if isNaN ent then (double2Float 0.0) else ent
-    where ent = (-a*(logBase 2 a)-b*(logBase 2 b))
+entropy :: Int -> Int -> Float
+entropy a b =
+    let total = a+b
+        fracA = (fromIntegral a) / (fromIntegral total) :: Float
+        fracB = (fromIntegral b) / (fromIntegral total) :: Float
+        ent = (-fracA*(logBase 2 fracA)-fracB*(logBase 2 fracB))
+    in if isNaN ent then (double2Float 0.0) else ent
 
 purity :: Set -> AttributeName -> Float
 purity a b =
     let setData = dataset a
         setDataResultIndex = (length setData)-1
         valuesResult = getDomainValues a ((getAttributeNames a)!!setDataResultIndex)
-        -- entropyResult = entropy valuesResult
         uniqueValuesDomain = unique domainValues
         uniqueValuesResult = unique valuesResult
-        temp = getAllOccurences domainValues valuesResult uniqueValuesResult uniqueValuesDomain
-    in double2Float(0.0)
+        sizeResults = length valuesResult
+        entropyResult = entropy (length [x | x <- valuesResult, x == uniqueValuesResult!!0]) (length [x | x <- valuesResult, x == uniqueValuesResult!!1])
+        occurences = getOccurences domainValues valuesResult uniqueValuesResult uniqueValuesDomain
+        entropyValues = [entropy (fst x) (snd x) | x <- occurences]
+        in (entropyResult - entropyValues!!0*(((fromIntegral ((fst (occurences!!0)) + (snd (occurences!!0))))/(fromIntegral sizeResults))::Float) - entropyValues!!1*(((fromIntegral ((fst (occurences!!1)) + (snd (occurences!!1))))/(fromIntegral sizeResults))::Float) - entropyValues!!2*(((fromIntegral ((fst (occurences!!2)) + (snd (occurences!!2))))/(fromIntegral sizeResults))::Float))
     where domainValues = getDomainValues a b
 
-getAllOccurences :: [DomainValue] -> [DomainValue] -> [DomainValue] -> [DomainValue] -> [Int]
-getAllOccurences domainValues valuesResult uniqueValuesResult [] = []
-getAllOccurences domainValues valuesResult uniqueValuesResult (uniqueDomainValue:uniqueValuesDomain) =
-    (getOccurences domainValues valuesResult uniqueValuesResult uniqueDomainValue) ++ (getAllOccurences domainValues valuesResult uniqueValuesResult uniqueValuesDomain)
-
-getOccurences :: [DomainValue] -> [DomainValue] -> [DomainValue] -> DomainValue -> [Int]
-getOccurences domainValues valuesResult uniqueValuesResult uniqueDomainValue =
-    [length [y | y <- domainValues, y == uniqueDomainValue && (valuesResult!!(fromJust $ (elemIndex y domainValues))) == (uniqueValuesResult!!0)]] ++
-    [length [y | y <- domainValues, y == uniqueDomainValue && (valuesResult!!(fromJust $ (elemIndex y domainValues))) == (uniqueValuesResult!!1)]]
+getOccurences :: [DomainValue] -> [DomainValue] -> [DomainValue] -> [DomainValue] -> [(Int,Int)]
+getOccurences domainValues valuesResult uniqueValuesResult [] = []
+getOccurences domainValues valuesResult uniqueValuesResult (uniqueDomainValue:uniqueValuesDomain) =
+    let temp = zip domainValues valuesResult
+        a = length [y | y <- temp, (fst y) == uniqueDomainValue && (snd y) == uniqueValuesResult!!0]
+        b = length [y | y <- temp, (fst y) == uniqueDomainValue && (snd y) == uniqueValuesResult!!1]
+    in [(a, b)]++ getOccurences domainValues valuesResult uniqueValuesResult uniqueValuesDomain
 
 -- Main function type = IO().
 main :: IO ()
@@ -110,11 +112,14 @@ main = do
     print attributeNames
     print (getDomainValues set (attributeNames!!1))
 
-    let ent = entropy 0.642857143 0.357142857
+    let ent = entropy 9 5
     print ent
 
-    let temp = getAllOccurences ["overcast","overcast","overcast","overcast","rainy","rainy","rainy","rainy","rainy","sunny","sunny","sunny","sunny","sunny"] ["yes","yes","yes","yes","yes","yes","no","yes","no","no","no","no","yes","yes"] ["yes","no"] ["overcast","rainy","sunny"]
+    let temp = getOccurences ["overcast","overcast","overcast","overcast","rainy","rainy","rainy","rainy","rainy","sunny","sunny","sunny","sunny","sunny"] ["yes","yes","yes","yes","yes","yes","no","yes","no","no","no","no","yes","yes"] ["yes","no"] ["overcast","rainy","sunny"]
     print temp
+
+    let arthur = purity set "Outlook"
+    print arthur
 
     putStrLn("End of program")
 
