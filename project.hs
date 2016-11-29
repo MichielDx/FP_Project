@@ -5,6 +5,7 @@ import System.IO
 import Data.List.Split
 import Data.Maybe
 import GHC.Float
+import Data.Tuple
 
 type FileName = String
 type AttributeName = String
@@ -12,8 +13,8 @@ type DomainValue = String
 type TargetValue = String
 type Instance = [String]
 
-data Attribute = Attribute {attribute :: (AttributeName, [DomainValue])} deriving (Show)
-data Set = DataSet {dataset :: [Attribute]} deriving (Show)
+data Attribute = Attribute {attribute :: (AttributeName, [DomainValue])} deriving (Show, Eq)
+data Set = DataSet {dataset :: [Attribute]} deriving (Show, Eq)
 data Tree = Leaf {leaf :: TargetValue} | Node { tuple :: (AttributeName, DomainValue), el :: [Tree]} deriving (Show)
 
 unique :: (Ord a) => [a] -> [a]
@@ -80,8 +81,8 @@ getOccurences :: [DomainValue] -> [DomainValue] -> [DomainValue] -> [DomainValue
 getOccurences domainValues valuesResult uniqueValuesResult [] = []
 getOccurences domainValues valuesResult uniqueValuesResult (uniqueDomainValue:uniqueValuesDomain) =
     let temp = zip domainValues valuesResult
-        a = length [y | y <- temp, (fst y) == uniqueDomainValue && (snd y) == uniqueValuesResult!!0]
-        b = length [y | y <- temp, (fst y) == uniqueDomainValue && (snd y) == uniqueValuesResult!!1]
+        a = length [y | y <- temp, (fst y) == uniqueDomainValue && (snd y) == "yes"]
+        b = length [y | y <- temp, (fst y) == uniqueDomainValue && (snd y) == "no"]
     in [(a, b)]++ getOccurences domainValues valuesResult uniqueValuesResult uniqueValuesDomain
 
 setPurity :: Set -> Float
@@ -95,8 +96,8 @@ setPurity set =
 getResultOccurences :: [DomainValue] -> (Int,Int)
 getResultOccurences domainValues =
     let uniqueValues = unique domainValues
-        a = length [y | y <- domainValues, y == (uniqueValues!!0)]
-        b = length [y | y <- domainValues, y == (uniqueValues!!1)]
+        a = length [y | y <- domainValues, y == "yes"]
+        b = length [y | y <- domainValues, y == "no"]
     in (a, b)
 
 bestSplit :: Set -> AttributeName
@@ -118,59 +119,25 @@ splitSet set =
     in if puritySet == 0 then [] else [createSet set bestAttributeName x | x<- uniqueDomainValues]
     where createSet :: Set -> AttributeName -> DomainValue -> Set
           createSet set attributeName domainValue =
-            let attributeNames = getAttributeNames set
-                indexAttribute = (fromJust $ (elemIndex attributeName attributeNames))
-                bestAttribute = attribute (setData!!indexAttribute)
-                indexBeginDomainValue = (fromJust $ (elemIndex domainValue (snd bestAttribute)))
-                indexEndDomainValue = length [x | x <- (snd bestAttribute), x == domainValue]
-                attributes = [Attribute { attribute = ((fst x),(fst (splitAt indexEndDomainValue (snd (splitAt indexBeginDomainValue (snd x))))))} | (Attribute x) <- setData]
+            let domainValues = getDomainValues set attributeName
+                attributes = [Attribute { attribute = ((fst x),[((snd x)!!y) | y <- [0..((length(domainValues))-1)], ((domainValues)!!y) == domainValue])} | (Attribute x) <- setData]
             in DataSet {dataset = attributes}
             where setData = dataset set
 
+buildTree :: AttributeName -> DomainValue -> Set -> Tree
+buildTree attributeName domainValue set@(setData) = 
+    let bestAttribute = bestSplit set
+        sets = splitSet set
+        uniqueValues = unique (getDomainValues set bestAttribute)
+    in if (length sets) == 0 then Node { tuple = (attributeName, domainValue), el = [Leaf{ leaf = ((unique (snd (attribute (last (dataset set)))))!!0) }]} else Node { tuple = (attributeName, domainValue), el = [buildTree bestAttribute (uniqueValues!!x) (sets!!x) | x <- [0..((length sets)-1)]]}
+
+id3Tree :: Set -> Tree
+id3Tree set =
+    buildTree (bestSplit set) "" set
+
 -- Main function type = IO().
 main :: IO ()
-main = do
-    putStrLn("Begin of program")
-    
-    --let att = Node {tuple = ("lol","lel"), el = [Leaf {leaf = "lol"}]}
-    --print att
-
-    let test = "abacdbbdcc"
-    print (unique test)
-
-    let test = argmax [2,5,6,9,10,72]
-    print test
-
-    let x = DataSet{dataset = [Attribute ("windy",["jep","nep"]), Attribute ("overcast",["nep"])]}
-    print (getAttributeNames x)
-
-    let a = getDomainValues x "windy"
-    print a
-
-    let temp = (readCsv "data/weather.csv")
-    set <- temp
-    print set
-    let attributeNames = (getAttributeNames set)
-    print attributeNames
-    print (getDomainValues set (attributeNames!!1))
-
-    let ent = entropy 9 5
-    print ent
-
-    let temp = getOccurences ["overcast","overcast","overcast","overcast","rainy","rainy","rainy","rainy","rainy","sunny","sunny","sunny","sunny","sunny"] ["yes","yes","yes","yes","yes","yes","no","yes","no","no","no","no","yes","yes"] ["yes","no"] ["overcast","rainy","sunny"]
-    print temp
-
-    let arthur = purity set "Outlook"
-    print arthur
-
-    let test = setPurity set
-    print test
-
-    let test2 = bestSplit set
-    print test2
-
-    let test3 = splitSet set
-    print test3
-
-    putStrLn("End of program")
-
+main = do 
+    set <- readCsv "data/weather.csv"
+    let final = id3Tree set
+    print final
