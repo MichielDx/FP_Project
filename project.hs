@@ -12,7 +12,7 @@ type DomainValue = String
 type TargetValue = String
 type Instance = [String]
 
-data Attribute = Attribute (AttributeName, [DomainValue]) deriving (Show)
+data Attribute = Attribute {attribute :: (AttributeName, [DomainValue])} deriving (Show)
 data Set = DataSet {dataset :: [Attribute]} deriving (Show)
 data Tree = Leaf {leaf :: TargetValue} | Node { tuple :: (AttributeName, DomainValue), el :: [Tree]} deriving (Show)
 
@@ -71,10 +71,9 @@ purity a b =
         uniqueValuesDomain = unique domainValues
         uniqueValuesResult = unique valuesResult
         sizeResults = length valuesResult
-        entropyResult = entropy (length [x | x <- valuesResult, x == uniqueValuesResult!!0]) (length [x | x <- valuesResult, x == uniqueValuesResult!!1])
         occurences = getOccurences domainValues valuesResult uniqueValuesResult uniqueValuesDomain
         entropyValues = [entropy (fst x) (snd x) | x <- occurences]
-        in (entropyResult - entropyValues!!0*(((fromIntegral ((fst (occurences!!0)) + (snd (occurences!!0))))/(fromIntegral sizeResults))::Float) - entropyValues!!1*(((fromIntegral ((fst (occurences!!1)) + (snd (occurences!!1))))/(fromIntegral sizeResults))::Float) - entropyValues!!2*(((fromIntegral ((fst (occurences!!2)) + (snd (occurences!!2))))/(fromIntegral sizeResults))::Float))
+    in (sum [entropyValues!!x*(((fromIntegral ((fst (occurences!!x)) + (snd (occurences!!x))))/(fromIntegral sizeResults))::Float) | x <- [0..((length occurences)-1)]])
     where domainValues = getDomainValues a b
 
 getOccurences :: [DomainValue] -> [DomainValue] -> [DomainValue] -> [DomainValue] -> [(Int,Int)]
@@ -84,6 +83,49 @@ getOccurences domainValues valuesResult uniqueValuesResult (uniqueDomainValue:un
         a = length [y | y <- temp, (fst y) == uniqueDomainValue && (snd y) == uniqueValuesResult!!0]
         b = length [y | y <- temp, (fst y) == uniqueDomainValue && (snd y) == uniqueValuesResult!!1]
     in [(a, b)]++ getOccurences domainValues valuesResult uniqueValuesResult uniqueValuesDomain
+
+setPurity :: Set -> Float
+setPurity set = 
+    let attributeNames = [fst x | (Attribute x ) <- setData]
+        occurences = getResultOccurences (getDomainValues set (last attributeNames))
+        puritySet = entropy (fst occurences) (snd occurences)
+    in puritySet
+    where setData = dataset set
+
+getResultOccurences :: [DomainValue] -> (Int,Int)
+getResultOccurences domainValues =
+    let uniqueValues = unique domainValues
+        a = length [y | y <- domainValues, y == (uniqueValues!!0)]
+        b = length [y | y <- domainValues, y == (uniqueValues!!1)]
+    in (a, b)
+
+bestSplit :: Set -> AttributeName
+bestSplit set =
+    let attributeNames = [fst x | (Attribute x) <- setData]
+        purityAttributes = [purity set x | x <- attributeNames]
+        puritySet = setPurity set
+        informationGains = [puritySet - x | x <- (init purityAttributes)]
+        indexBestSplit = argmax informationGains
+    in attributeNames!!indexBestSplit
+    where setData = dataset set
+
+splitSet :: Set -> [Set]
+splitSet set =
+    let puritySet = setPurity set
+        bestAttributeName = bestSplit set
+        domainValues = getDomainValues set bestAttributeName
+        uniqueDomainValues = unique domainValues
+    in if puritySet == 0 then [] else [createSet set bestAttributeName x | x<- uniqueDomainValues]
+    where createSet :: Set -> AttributeName -> DomainValue -> Set
+          createSet set attributeName domainValue =
+            let attributeNames = getAttributeNames set
+                indexAttribute = (fromJust $ (elemIndex attributeName attributeNames))
+                bestAttribute = attribute (setData!!indexAttribute)
+                indexBeginDomainValue = (fromJust $ (elemIndex domainValue (snd bestAttribute)))
+                indexEndDomainValue = length [x | x <- (snd bestAttribute), x == domainValue]
+                attributes = [Attribute { attribute = ((fst x),(fst (splitAt indexEndDomainValue (snd (splitAt indexBeginDomainValue (snd x))))))} | (Attribute x) <- setData]
+            in DataSet {dataset = attributes}
+            where setData = dataset set
 
 -- Main function type = IO().
 main :: IO ()
@@ -120,6 +162,15 @@ main = do
 
     let arthur = purity set "Outlook"
     print arthur
+
+    let test = setPurity set
+    print test
+
+    let test2 = bestSplit set
+    print test2
+
+    let test3 = splitSet set
+    print test3
 
     putStrLn("End of program")
 
